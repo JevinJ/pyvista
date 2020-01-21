@@ -24,6 +24,7 @@ class DataSetAttributes(VTKObjectWrapper):
     def __init__(self, vtkobject, dataset, association):
         super().__init__(vtkobject=vtkobject)
         self.dataset = dataset
+        self.association_bitarray_names = dataset.association_bitarray_names
         self.association = association
 
     def __getitem__(self, key):
@@ -111,7 +112,7 @@ class DataSetAttributes(VTKObjectWrapper):
                 raise KeyError('"{}"'.format(key))
             return vtk_arr
         narray = pyvista_ndarray.from_vtk_data_array(vtk_arr, dataset=self.dataset, association=self.association)
-        if vtk_arr.GetName() in self.dataset.association_bitarray_names[self.association]:
+        if vtk_arr.GetName() in self.association_bitarray_names[self.association]:
             narray = narray.view(numpy.bool)
         return narray
 
@@ -135,7 +136,7 @@ class DataSetAttributes(VTKObjectWrapper):
         if isinstance(narray, (list, tuple)):
             narray = pyvista_ndarray.from_iter(narray)
         if narray.dtype == numpy.bool:
-            self.dataset.association_bitarray_names[self.association].add(name)
+            self.association_bitarray_names[self.association].add(name)
             narray = narray.view(numpy.uint8)
 
         if self.association == FieldAssociation.POINT:
@@ -190,16 +191,18 @@ class DataSetAttributes(VTKObjectWrapper):
         self.VTKObject.Modified()
 
     def remove(self, key):
+        """Given an array name or index, remove the array."""
         self._raise_index_out_of_bounds(index=key)
         name = self.get_array(key).GetName()
         try:
-            self.dataset.association_bitarray_names[self.association].remove(name)
+            self.association_bitarray_names[self.association].remove(name)
         except KeyError:
             pass
         self.VTKObject.RemoveArray(key)
         self.VTKObject.Modified()
 
     def pop(self, key):
+        """Given an array name or index, remove the array and return it."""
         self._raise_index_out_of_bounds(index=key)
         vtk_arr = self.GetArray(key)
         if vtk_arr:

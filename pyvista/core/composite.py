@@ -477,12 +477,6 @@ class MultiBlock(vtkMultiBlockDataSet, CompositeFilters, DataObject):
            Deep or shallow copy of the input.
 
         """
-        thistype = type(self)
-        newobject = thistype()
-        if deep:
-            newobject.deep_copy(self)
-        else:
-            newobject.shallow_copy(self)
-        newobject.copy_meta_from(self)
+        newobject = super().copy(deep=deep)
         newobject.wrap_nested()
         return newobject

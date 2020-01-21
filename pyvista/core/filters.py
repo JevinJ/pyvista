@@ -1,6 +1,6 @@
 """These classes hold methods to apply general filters to any data type.
 
-By inherritting these classes into the wrapped VTK data structures, a user
+By inheriting these classes into the wrapped VTK data structures, a user
 can easily apply common filters in an intuitive manner.
 
 Example
@@ -1298,7 +1298,7 @@ class DataSetFilters(object):
             The source vtk data object as the mesh to sample values on to
 
         target: pyvista.DataSet
-            The vtk data object to sample from - point and cell arrays from
+            The vtk dataset to sample from - point and cell arrays from
             this object are sampled onto the nodes of the ``dataset`` mesh
 
         tolerance: float, optional

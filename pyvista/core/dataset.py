@@ -28,7 +28,7 @@ class DataObject(vtkDataObject, ABC):
     """Methods common to all wrapped data objects."""
 
     def __new__(cls, *args, **kwargs):
-        """Allocate a DataObject."""
+        """Allocate memory for the data object."""
         if cls is DataObject:
             raise TypeError("pyvista.DataObject is an abstract class and may not be instantiated.")
         return object.__new__(cls, *args, **kwargs)
@@ -87,10 +87,12 @@ class DataObject(vtkDataObject, ABC):
         filename = os.path.abspath(os.path.expanduser(filename))
         if not os.path.isfile(filename):
             raise FileNotFoundError('File %s does not exist' % filename)
+
         file_ext = fileio.get_ext(filename)
         if file_ext not in self._vtk_readers:
             raise ValueError('Invalid file extension for this data type. Must be one of: {}'.format(
                 self._vtk_readers.keys()))
+
         reader = self._vtk_readers[file_ext]()
         reader.SetFileName(filename)
         reader.Update()
@@ -98,12 +100,12 @@ class DataObject(vtkDataObject, ABC):
 
 
     def save(self, filename, binary=True):
-        """Save this vtk object to file.
+        """Write this data object to file.
 
         Parameters
         ----------
         filename : str
-         Filename of output file. Writer type is inferred from
+         Filename of the output file. Writer type is inferred from
          the extension of the filename.
 
         binary : bool, optional
@@ -120,6 +122,7 @@ class DataObject(vtkDataObject, ABC):
         if file_ext not in self._vtk_writers:
             raise ValueError('Invalid file extension for this data type. Must be one of: {}'.format(
                 self._vtk_writers.keys()))
+
         writer = self._vtk_writers[file_ext]()
         fileio.set_vtkwriter_mode(vtk_writer=writer, use_binary=binary)
         writer.SetFileName(filename)
@@ -267,7 +270,7 @@ class DataObject(vtkDataObject, ABC):
         self.field_arrays.append(scalars, name, deep_copy=deep)
 
 
-    def _add_field_scalar(self, scalars, name, set_active=False, deep=True):
+    def _add_field_scalar(self, scalars, name, deep=True):
         """Add a field array.
 
         DEPRECATED: Please use `_add_field_array` instead.
@@ -276,6 +279,7 @@ class DataObject(vtkDataObject, ABC):
         warnings.warn('Deprecation Warning: `_add_field_scalar` is now `_add_field_array`', RuntimeWarning)
         return self._add_field_array(scalars, name, deep=deep)
 
+
     def add_field_array(self, scalars, name, deep=True):
         """Add a field array."""
         self._add_field_array(scalars, name, deep=deep)
@@ -283,7 +287,7 @@ class DataObject(vtkDataObject, ABC):
 
     @property
     def field_arrays(self):
-        """"Return vtkFieldData as a DataSetAttributes instance."""
+        """Return vtkFieldData as a DataSetAttributes instance."""
         return DataSetAttributes(self.GetFieldData(), dataset=self, association=FieldAssociation.FIELD)
 
 
@@ -293,20 +297,22 @@ class DataObject(vtkDataObject, ABC):
 
 
 class DataSet(DataSetFilters, DataObject, vtkDataSet):
-    """ Methods in common to spatially referenced objects"""
+    """Methods in common to spatially referenced objects"""
 
     # Simply bind pyvista.plotting.plot to the object
     plot = pyvista.plot
 
 
     def __new__(cls, *args, **kwargs):
+        """Allocate memory for the dataset."""
         if cls is DataSet:
             raise TypeError("pyvista.DataSet is an abstract class and may not be instantiated.")
         return object.__new__(cls, *args, **kwargs)
 
 
     def __init__(self, *args, **kwargs):
-        super(DataSet, self).__init__(*args, **kwargs)
+        """Initialize the dataset."""
+        super().__init__(*args, **kwargs)
         #TODO, remove because this information is already in DataSetAttributes.
         self._active_scalars_info = 0, None  # Scalar field and name
         self._last_active_scalars_name = None
@@ -318,11 +324,10 @@ class DataSet(DataSetFilters, DataObject, vtkDataSet):
         field, name = self._active_scalars_info
         excluded_names = {'__custom_rgba', 'Normals', 'vtkOriginalPointIds', 'TCoords'}
 
-        def first_valid_array_name(field_data):
-            for i in range(field_data.GetNumberOfArrays()):
-                name = field_data.GetArrayName(i)
-                if name not in excluded_names:
-                    return name
+        def first_valid_array_name(field_attributes):
+            for array_name in field_attributes:
+                if array_name not in excluded_names:
+                    return array_name
 
         if name in excluded_names:
             name = self._last_active_scalars_name
@@ -331,8 +336,8 @@ class DataSet(DataSetFilters, DataObject, vtkDataSet):
             if self.n_arrays == 0:
                 return field, name
             # find some array in the set field
-            active_point_array = first_valid_array_name(field_data=self.GetPointData())
-            active_cell_array = first_valid_array_name(field_data=self.GetCellData())
+            active_point_array = first_valid_array_name(field_attributes=self.point_arrays)
+            active_cell_array = first_valid_array_name(field_attributes=self.cell_arrays)
             if active_point_array:
                 self._active_scalars_info = (FieldAssociation.POINT, active_point_array)
                 self.GetPointData().SetActiveScalars(active_point_array)
@@ -340,7 +345,6 @@ class DataSet(DataSetFilters, DataObject, vtkDataSet):
                 self._active_scalars_info = (FieldAssociation.CELL, active_cell_array)
                 self.GetCellData().SetActiveScalars(active_cell_array)
         return self._active_scalars_info
-
 
     @property
     def active_scalar_info(self):
@@ -354,13 +358,13 @@ class DataSet(DataSetFilters, DataObject, vtkDataSet):
 
     @property
     def active_vectors_info(self):
-        """Return the active vector's field and name: [field, name]."""
+        """Return the active vector's field and name: (field, name)."""
         if not hasattr(self, '_active_vectors_info'):
             # Sometimes, precomputed normals aren't set as active
             if 'Normals' in self.array_names:
                 self.set_active_vectors('Normals')
             else:
-                self._active_vectors_info = [FieldAssociation.POINT, None] # field and name
+                self._active_vectors_info = (FieldAssociation.POINT, None) # field and name
         _, name = self._active_vectors_info
         return self._active_vectors_info
 
@@ -827,6 +831,9 @@ class DataSet(DataSetFilters, DataObject, vtkDataSet):
 
         """
         self.cell_arrays.append(scalars, name, deep_copy=deep)
+        if set_active or self.active_scalars_info[1] is None:
+            self.GetCellData().SetActiveScalars(name)
+            self._active_scalars_info = (FieldAssociation.CELL, name)
 
 
     def _add_cell_scalar(self, scalars, name, set_active=False, deep=True):
@@ -853,15 +860,15 @@ class DataSet(DataSetFilters, DataObject, vtkDataSet):
         return DataSetAttributes(self.GetPointData(), dataset=self, association=FieldAssociation.POINT)
 
 
-    def _remove_array(self, field, name):
-        """Remove a single array by name from each field (internal helper)."""
+    def _remove_array(self, field, key):
+        """Remove a single array by name or index  from each field (internal helper)."""
         field = parse_field_choice(field)
         if field == FieldAssociation.POINT:
-            self.GetPointData().RemoveArray(name)
+            self.GetPointData().RemoveArray(key)
         elif field == FieldAssociation.CELL:
-            self.GetCellData().RemoveArray(name)
+            self.GetCellData().RemoveArray(key)
         elif field == FieldAssociation.FIELD:
-            self.GetFieldData().RemoveArray(name)
+            self.GetFieldData().RemoveArray(key)
         else:
             raise NotImplementedError('Not able to remove arrays from the ({}) data field'.format(field))
         return
@@ -1105,12 +1112,12 @@ class DataSet(DataSetFilters, DataObject, vtkDataSet):
                     ncomp = 1
                 return row.format(name, field, arr.dtype, ncomp, dl, dh)
 
-            for array in self.point_arrays.values():
-                fmt += format_array(array.GetName(), array, 'Points')
-            for array in self.cell_arrays.values():
-                fmt += format_array(array.GetName(), array, 'Cells')
-            for array in self.field_arrays.values():
-                fmt += format_array(array.GetName(), array, 'Fields')
+            for key, arr in self.point_arrays.items():
+                fmt += format_array(key, arr, 'Points')
+            for key, arr in self.cell_arrays.items():
+                fmt += format_array(key, arr, 'Cells')
+            for key, arr in self.field_arrays.items():
+                fmt += format_array(key, arr, 'Fields')
 
             fmt += "</table>\n"
             fmt += "\n"
@@ -1176,7 +1183,9 @@ class DataSet(DataSetFilters, DataObject, vtkDataSet):
             import pyansys
         except ImportError:
             raise Exception('Install pyansys for this function')
-        dataset = self if isinstance(self, pyvista.UnstructuredGrid) else self.cast_to_unstructured_grid()
+        if isinstance(self, pyvista.UnstructuredGrid):
+            return pyansys.CellQuality(self)
+        dataset = self.cast_to_unstructured_grid()
         return pyansys.CellQuality(dataset)
 
 

@@ -350,11 +350,10 @@ class PolyData(vtkPolyData, PointSet, PolyDataFilters):
          file size.
 
         """
-        filename = os.path.abspath(os.path.expanduser(filename))
         ftype = get_ext(filename)
         # Recompute normals prior to save.  Corrects a bug were some
         # triangular meshes are not saved correctly
-        if ftype in ['stl', 'ply']:
+        if ftype in ('stl', 'ply'):
             self.compute_normals(inplace=True)
         super().save(filename, binary)
 

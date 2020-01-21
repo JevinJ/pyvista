@@ -97,6 +97,7 @@ class RectilinearGrid(vtkRectilinearGrid, Grid):
 
         elif len(args) == 3 or len(args) == 2:
             if all(isinstance(arg, np.ndarray) for arg in args):
+                # Pad args to 3
                 args += (np.array([0.]),) * (3 - len(args))
                 self._from_arrays(*args)
 
